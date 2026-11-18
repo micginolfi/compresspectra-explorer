@@ -37,6 +37,8 @@ spectra with large internal gaps.
 **Cutouts**
 - RGB cutouts load from the DJA and need a connection. Spectra are stored in the page.
 
+**H-band magnitude cut.** The slider in the top bar shows only spectra brighter than a chosen H-band AB magnitude (off by default). For each spectrum, H is computed from the PRISM spectrum itself by synthetic photometry: the flux density (µJy, DJA point-source slit-loss correction applied) is averaged over the 2MASS H filter, weighting each pixel by the filter transmission T, its width Δλ and 1/λ (photon-counting convention), ⟨f_ν⟩ = Σ f_ν T Δλ/λ / Σ T Δλ/λ, and converted to H = 23.9 − 2.5 log₁₀⟨f_ν⟩. Only valid pixels are used; H is undefined when they cover less than 80% of the filter weight or when ⟨f_ν⟩ ≤ 0, and such spectra are shown only when the cut is off. For compact sources the values agree with NIRCam F150W photometry to within a few hundredths of a magnitude (scatter ~0.3 mag); extended galaxies come out fainter because of slit losses.
+
 ## True embedding neighbours
 
 Clicking an object draws lines to its 10 nearest objects in the full 10-D embedding.
