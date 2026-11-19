@@ -10,7 +10,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 #top,#ctl{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
 #top{padding:6px 10px;border-bottom:1px solid var(--line)}#top b{font-size:14px}label{white-space:nowrap}
 #find{width:190px}.mut{color:var(--mut)}
-#hcut{display:flex;align-items:center;gap:5px}#hcut input[type=range]{width:160px}#hcut input[type=number]{width:56px}
+#hcut{display:flex;align-items:center;gap:5px}#hcut input[type=range]{width:160px}#hcut input[type=number]{width:56px}#cos[aria-pressed=true]{background:#2e7dd7;border-color:#2e7dd7;color:#fff}
 #main{flex:1 1 0;min-height:0;display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr);gap:6px;padding:6px 10px 8px}
 #mapbox{position:relative;border:1px solid var(--line);min-width:0;min-height:0}#map{position:absolute;inset:0;width:100%;height:100%;background:var(--plot);cursor:crosshair}
 #right{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
@@ -36,7 +36,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 <label><input type="checkbox" id="nbr" checked> true embedding neighbours</label>
 <input type="text" id="find" placeholder="find: name, id or Paper I obj">
 <button id="reset">reset zoom</button><span id="st" class="mut"></span>
-<span id="hcut" title="Show only spectra brighter than this H-band AB magnitude, measured from the PRISM spectrum through the 2MASS H filter (point-source slit-loss correction; extended galaxies come out too faint). Spectra with no positive flux in H are shown only when the cut is off."><b>H &lt;</b><input type="range" id="hs" step="0.1"><input type="number" id="hv" step="0.1"><span>mag</span><button id="hall">show all</button><span id="hn" class="mut"></span></span></div>
+<span id="hcut" title="Show only spectra brighter than this H-band AB magnitude, measured from the PRISM spectrum through the 2MASS H filter (point-source slit-loss correction; extended galaxies come out too faint). Spectra with no positive flux in H are shown only when the cut is off."><b>H &lt;</b><input type="range" id="hs" step="0.1"><input type="number" id="hv" step="0.1"><span>mag</span><button id="hall">show all</button><button id="cos" aria-pressed="false" title="Show only spectra in the COSMOS field (selected by position: 149.3 &lt; RA &lt; 150.9, 1.4 &lt; Dec &lt; 3.0). Combines with the H cut.">COSMOS only</button><span id="hn" class="mut"></span></span></div>
 <div id="main">
 <div id="mapbox"><canvas id="map"></canvas><div id="help" hidden><b>True embedding neighbours.</b> Lines link the selected object to its 10 nearest objects in the full embedding, before UMAP. They are the most similar spectra. UMAP squeezes the embedding into 2-D, so long lines mean the map separates objects that are really close.</div></div>
 <div id="right">
@@ -59,7 +59,8 @@ const VIR=["#440154","#482475","#414487","#355f8d","#2a788e","#21908d","#22a884"
 const G=[["g_agn",/BLAGN/,"#2166ac","D"],["g_lrd",/LRD \((de Graaff|new)/,"#d6204b","o"]];
 const grp=M.label.map(l=>{if(!l)return -1;for(let i=0;i<G.length;i++)if(G[i][1].test(l))return i;return -1});
 const HM=M.hmag.map(v=>v===null?NaN:v),HF=HM.filter(Number.isFinite),HMIN=Math.floor(HF.reduce((a,b)=>Math.min(a,b),Infinity)*10)/10,HMAX=Math.ceil(HF.reduce((a,b)=>Math.max(a,b),-Infinity)*10)/10;let hcut=HMAX;
-const vis=i=>hcut>=HMAX||HM[i]<=hcut;
+const COS=M.ra.map((r,i)=>r>149.3&&r<150.9&&M.dec[i]>1.4&&M.dec[i]<3.0);let cosOnly=false;   // COSMOS-only toggle, by position
+const vis=i=>(hcut>=HMAX||HM[i]<=hcut)&&(!cosOnly||COS[i]);
 let sel=-1,k0=1,k=1,tx=0,ty=0,xlim=null;const c=$("map");const on=()=>G.map(g=>$(g[0]).checked);
 function size(cv){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;return[r.width,r.height,d]}
 const X=i=>k*U[0][i]+tx,Y=i=>-k*U[1][i]+ty;
@@ -110,18 +111,18 @@ function pick(i){sel=i;draw();drawSpec();cutouts(i);let sh=0;const d=[];for(let 
 function hp(){$("help").hidden=!$("nbr").checked}
 $("nbr").addEventListener("change",()=>{hp();draw()});["cz",...G.map(g=>g[0])].forEach(i=>$(i).addEventListener("change",draw));["ys","yq","fully","dots"].forEach(i=>$(i).addEventListener("change",drawSpec));["fr","xs"].forEach(i=>$(i).addEventListener("change",()=>{xlim=null;drawSpec()}));
 $("lc").addEventListener("change",()=>cutouts(sel));$("reset").addEventListener("click",reset);
-$("find").addEventListener("change",e=>{const q=e.target.value.trim().toLowerCase();if(!q)return;let i=-1;if(/^\d+$/.test(q)){i=M.obj.indexOf(+q);if(i<0)i=M.file.findIndex(f=>f.endsWith("_"+q))}else i=M.file.findIndex(f=>f.toLowerCase().includes(q));if(i>=0&&!vis(i)){$("st").textContent=`found, but fainter than the H cut (H = ${Number.isFinite(HM[i])?HM[i].toFixed(1):"n/a"})`;return}$("st").textContent=i<0?"not found":"";if(i>=0)pick(i)});
+$("find").addEventListener("change",e=>{const q=e.target.value.trim().toLowerCase();if(!q)return;let i=-1;if(/^\d+$/.test(q)){i=M.obj.indexOf(+q);if(i<0)i=M.file.findIndex(f=>f.endsWith("_"+q))}else i=M.file.findIndex(f=>f.toLowerCase().includes(q));if(i>=0&&!vis(i)){$("st").textContent=cosOnly&&!COS[i]?"found, but outside COSMOS":`found, but fainter than the H cut (H = ${Number.isFinite(HM[i])?HM[i].toFixed(1):"n/a"})`;return}$("st").textContent=i<0?"not found":"";if(i>=0)pick(i)});
 function use(e){cur=e;NN=e.nnv||(e.nnv=new Uint16Array(dec(e.nn)));U=e.u;lo=[Math.min(...U[0]),Math.min(...U[1])];hi=[Math.max(...U[0]),Math.max(...U[1])];$("sub").textContent=`${e.name}, ${e.size}, ${N.toLocaleString()} spectra`;xlim=null;reset();if(sel>=0)pick(sel)}
 function route(){const e=M.emb.find(x=>x.key===location.hash.slice(1));$("home").hidden=!!e;if(e&&e!==cur)use(e)}
 $("hsub").textContent=`${N.toLocaleString()} NIRSpec PRISM spectra from the DAWN JWST Archive. Choose how to explore them:`;
 M.emb.forEach(e=>{const b=document.createElement("button");b.className="card";b.innerHTML=`<b>${e.name}</b><span class="mut">${e.size}</span><span>${e.desc}</span>`;b.addEventListener("click",()=>{location.hash=e.key});$("cards").appendChild(b)});
 $("back").addEventListener("click",()=>{location.hash=""});addEventListener("hashchange",route);
-function hcount(v){if(v>=HMAX)return N;let n=0;for(let i=0;i<N;i++)if(HM[i]<=v)n++;return n}
-function hlabel(v){const n=hcount(v);$("hn").textContent=v>=HMAX?`all ${N.toLocaleString()}`:`${n.toLocaleString()} of ${N.toLocaleString()}`}
+function hcount(v){if(v>=HMAX&&!cosOnly)return N;let n=0;for(let i=0;i<N;i++)if((v>=HMAX||HM[i]<=v)&&(!cosOnly||COS[i]))n++;return n}
+function hlabel(v){const n=hcount(v);$("hn").textContent=v>=HMAX&&!cosOnly?`all ${N.toLocaleString()}`:`${n.toLocaleString()} of ${N.toLocaleString()}`}
 function setH(v){hcut=Math.min(Math.max(v,HMIN),HMAX);$("hs").value=hcut;$("hv").value=hcut.toFixed(1);hlabel(hcut);
- if(sel>=0&&!vis(sel)){sel=-1;$("info").textContent="Selected spectrum hidden by the H cut. Click a point on the map.";$("cutimg").textContent="";drawSpec()}if(cur)draw()}
+ if(sel>=0&&!vis(sel)){sel=-1;$("info").textContent="Selected spectrum hidden by the H cut or the COSMOS filter. Click a point on the map.";$("cutimg").textContent="";drawSpec()}if(cur)draw()}
 $("hs").min=HMIN;$("hs").max=HMAX;$("hv").min=HMIN;$("hv").max=HMAX;
 $("hs").addEventListener("input",()=>{$("hv").value=(+$("hs").value).toFixed(1);hlabel(+$("hs").value);hcut=+$("hs").value>=HMAX?HMAX:+$("hs").value;if(cur)draw()});
-$("hs").addEventListener("change",()=>setH(+$("hs").value));$("hv").addEventListener("change",()=>{const v=parseFloat($("hv").value);if(Number.isFinite(v))setH(v)});$("hall").addEventListener("click",()=>setH(HMAX));setH(HMAX);
+$("hs").addEventListener("change",()=>setH(+$("hs").value));$("hv").addEventListener("change",()=>{const v=parseFloat($("hv").value);if(Number.isFinite(v))setH(v)});$("hall").addEventListener("click",()=>setH(HMAX));$("cos").addEventListener("click",()=>{cosOnly=!cosOnly;$("cos").setAttribute("aria-pressed",cosOnly);setH(hcut)});setH(HMAX);
 addEventListener("resize",()=>{if(cur){draw();drawSpec()}});hp();route();
 </script></body></html>
